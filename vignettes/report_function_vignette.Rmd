@@ -31,9 +31,15 @@ library(data.table)
 Questo documento dimostra l'utilizzo delle funzioni contenute nel pacchetto `myLibraryTS` per eseguire l'analisi completa, dall'unione dei dati al calcolo dei tassi anomali.
 
 ## 1. Caricamento e Preparazione dei Dati
+## 2. Dati di Esempio e Requisiti di Input
 
-// Qui spieghi come caricare i dati (simula i file .csv)
-// Se non hai i file, devi creare data.table di esempio minimi per far funzionare le funzioni.
+Per dimostrare la funzionalità del pacchetto `mylibraryTS`, questa Vignette utilizza set di dati (`data.table`) che mimano la struttura dei file CSV originali di input (conteggi genici, metadati, varianti e geni).
+
+Questo approccio garantisce che il tutorial sia **riproducibile** anche senza i file di dati esterni. Nella pratica, un utente dovrebbe caricare i propri file CSV (ad esempio, con `data.table::fread("file.csv")`) nella stessa struttura definita di seguito.
+
+### Strutture di Input Simulate
+
+Questi blocchi definiscono le strutture chiave utilizzate nelle pipeline:
 
 ```{r example_data}
 # Esempio: Conteggi Genici e Metadati (Esercizi 1, 4, 8)
@@ -134,3 +140,4 @@ head(normalized_dt)
 
 # Verifica la disponibilità di tutte le funzioni esportate
 ls(package:myLibraryTS)
+
