@@ -22,3 +22,5 @@ Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
+URL: https://github.com/teresascardigli/mylibraryTS
+BugReports: https://github.com/teresascardigli/mylibraryTS/issues
