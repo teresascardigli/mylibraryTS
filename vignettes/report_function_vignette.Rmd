@@ -1,0 +1,136 @@
+---
+title: "report_function_vignette"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{report_function_vignette}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(mylibraryTS)
+library(data.table)
+```
+
+
+# Introduzione alla Pipeline di Analisi
+
+Questo documento dimostra l'utilizzo delle funzioni contenute nel pacchetto `myLibraryTS` per eseguire l'analisi completa, dall'unione dei dati al calcolo dei tassi anomali.
+
+## 1. Caricamento e Preparazione dei Dati
+
+// Qui spieghi come caricare i dati (simula i file .csv)
+// Se non hai i file, devi creare data.table di esempio minimi per far funzionare le funzioni.
+
+```{r example_data}
+# Esempio: Conteggi Genici e Metadati (Esercizi 1, 4, 8)
+gene_counts_dt <- data.table(
+  gene = rep(paste0("GENE_", 1:5), 4),
+  sample_id = rep(c("S1", "S2", "S3", "S4"), each = 5),
+  count = sample(1:200, 20)
+)
+sample_dt <- data.table(
+  sample_id = c("S1", "S2", "S3", "S4"),
+  condition = c("treated", "control", "treated", "control"),
+  patient_id = c("P1", "P1", "P2", "P2")
+)
+
+# Esempio: Varianti e Geni (Esercizio 11)
+variants_dt_in <- data.table(
+  chr = c("chr1", "chr1", "chr2"), pos = c(100, 150, 200),
+  ref = c("A", "C", "T"), alt = c("G", "T", "G"),
+  impact = c("HIGH", "LOW", "HIGH"), sample_id = c("S1", "S2", "S3")
+)
+genes_dt_in <- data.table(
+  chr = c("chr1", "chr2"), start = c(50, 180), end = c(300, 500), gene = c("GENE_A", "GENE_B")
+)
+```
+
+media_geni <- calcola_media_gene_condition_dt(gene_counts_dt, sample_dt)
+head(media_geni)
+
+# Copia per evitare modifiche in-place sui dati base
+counts_copy_e2 <- data.table::copy(gene_counts_dt)
+counts_with_cols <- aggiungi_colonne_base_dt(counts_copy_e2)
+head(counts_with_cols)
+
+joined_dt <- esegui_equi_join_dt(gene_counts_dt, sample_dt)
+head(joined_dt)
+
+
+# Aggregazione per paziente
+conteggi_paziente <- aggrega_conteggi_per_paziente_dt(gene_counts_dt, sample_dt)
+conteggi_paziente
+
+# Trova i Top 10 geni per condition
+top_geni <- trova_top_geni_per_condition_dt(gene_counts_dt, sample_dt)
+top_geni
+
+
+clinical_dt_ex <- data.table(patient_id=c("P1", "P2"), lab=c("GLU", "GLU"), value=c(150, 90))
+lab_dt_ex <- data.table(lab=c("GLU"), lower=c(70), upper=c(100))
+
+class_labs <- classifica_labs_dt(clinical_dt_ex, lab_dt_ex)
+class_labs
+
+# Dati di esempio per i picchi
+atac_peaks_dt_ex <- data.table(
+  chr = c("chr1", "chr2", "chr2", "chr2"), 
+  start = c(1000, 2500000, 3000000, 3500000), 
+  end = c(1500, 2500100, 3000100, 3500100), 
+  score = c(90, 85, 95, 80)
+)
+# Filtraggio e selezione
+filtered_peaks <- filtra_picchi_atac_dt(atac_peaks_dt_ex)
+top_peaks <- seleziona_top_picchi_dt(filtered_peaks)
+top_peaks
+
+stats_wide <- calcola_statistiche_wide_dt(gene_counts_dt, sample_dt)
+head(stats_wide)
+
+
+# Simula dati wide per il melt
+bulk_wide_ex <- data.table(gene = paste0("G", 1:3), S1=c(10, 20, 30), S2=c(50, 40, 30))
+dt_long <- trasforma_e_calcola_totale_dt(bulk_wide_ex)
+dt_long
+
+
+mapped_variants <- mappa_varianti_a_geni_dt(variants_dt_in, genes_dt_in)
+head(mapped_variants)
+
+# Conteggio delle varianti HIGH-Impact
+high_impact_summary <- conta_varianti_high_impact_dt(mapped_variants)
+high_impact_summary$gene_summary
+
+
+# Simulazione seconda coorte
+cohortB_dt_ex <- data.table(sample_id="S5", condition="control", cohort="B")
+combined_samples_ex <- unisci_metadati_dt(sample_dt[, .(sample_id, condition, cohort="A")], cohortB_dt_ex)
+combined_samples_ex
+
+
+# Simulazione del riepilogo per task finali
+summary_table_ex <- data.table(
+  integration_cluster = c(1, 1, 2), cell_type = c("T_Cell", "B_Cell", "T_Cell"), 
+  sample_type = c("Normal", "Normal", "Tumor"), cell_count = c(100, 50, 80)
+)
+# Calcola la percentuale di cell type all'interno di ogni gruppo
+normalized_dt <- task5_normalizza_percentuali(summary_table_ex, output_file = "temp_normalized_percentages.csv")
+head(normalized_dt)
+
+
+# Verifica la disponibilità di tutte le funzioni esportate
+ls(package:myLibraryTS)
