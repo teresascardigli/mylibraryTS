@@ -1,143 +1,149 @@
 ---
-title: "report_function_vignette"
-output: rmarkdown::html_vignette
+title: "Tutorial Esteso per mylibraryTS"
+author: "Teresa Scardigli"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
 vignette: >
-  %\VignetteIndexEntry{report_function_vignette}
+  %\VignetteIndexEntry{Tutorial Esteso per mylibraryTS}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
 )
-```
 
+1. Introduzione al Pacchetto mylibraryTS
+Il pacchetto mylibraryTS è una raccolta di funzioni ottimizzate con data.table per l'analisi rapida e riproducibile di dati omici ad alto throughput (conteggi genici, metadati di campioni, dati di integrazione e varianti genomiche).
 
-```{r setup, message=FALSE, warning=FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
-)
+Questa Vignette guida l'utente attraverso tre pipeline di analisi principali, dimostrando come le funzioni lavorano insieme per rispondere agli obiettivi del progetto.
+
+Snippet di codice
 
 library(mylibraryTS)
 library(data.table)
+library(ggplot2)
 ```
+2. Preparazione dei Dati di Esempio (Simulazione)
+Per garantire la riproducibilità del tutorial, generiamo set di dati di esempio che mimano la struttura dei file di input richiesti dalle funzioni.
 
+Snippet di codice
 
-# Introduzione alla Pipeline di Analisi
-
-Questo documento dimostra l'utilizzo delle funzioni contenute nel pacchetto `myLibraryTS` per eseguire l'analisi completa, dall'unione dei dati al calcolo dei tassi anomali.
-
-## 1. Caricamento e Preparazione dei Dati
-## 2. Dati di Esempio e Requisiti di Input
-
-Per dimostrare la funzionalità del pacchetto `mylibraryTS`, questa Vignette utilizza set di dati (`data.table`) che mimano la struttura dei file CSV originali di input (conteggi genici, metadati, varianti e geni).
-
-Questo approccio garantisce che il tutorial sia **riproducibile** anche senza i file di dati esterni. Nella pratica, un utente dovrebbe caricare i propri file CSV (ad esempio, con `data.table::fread("file.csv")`) nella stessa struttura definita di seguito.
-
-### Strutture di Input Simulate
-
-Questi blocchi definiscono le strutture chiave utilizzate nelle pipeline:
-
-```{r example_data}
-# Esempio: Conteggi Genici e Metadati (Esercizi 1, 4, 8)
+# --- 1. Dati per Analisi Bulk (Esercizio 1, 2) ---
+# gene_counts_dt: Conteggi di espressione (gene, sample_id, count)
 gene_counts_dt <- data.table(
-  gene = rep(paste0("GENE_", 1:5), 4),
-  sample_id = rep(c("S1", "S2", "S3", "S4"), each = 5),
-  count = sample(1:200, 20)
+  gene = c(paste0("GENE_00", 1:3), paste0("GENE_A", 1:3)),
+  sample_id = rep(paste0("S", 1:2), each = 3),
+  count = c(500, 10, 800, 15, 600, 8)
 )
+# sample_dt: Metadati del campione (sample_id, condition)
 sample_dt <- data.table(
-  sample_id = c("S1", "S2", "S3", "S4"),
-  condition = c("treated", "control", "treated", "control"),
-  patient_id = c("P1", "P1", "P2", "P2")
+  sample_id = paste0("S", 1:2),
+  condition = c("treated", "control"),
+  patient_id = c("P1", "P2")
 )
 
-# Esempio: Varianti e Geni (Esercizio 11)
-variants_dt_in <- data.table(
-  chr = c("chr1", "chr1", "chr2"), pos = c(100, 150, 200),
-  ref = c("A", "C", "T"), alt = c("G", "T", "G"),
-  impact = c("HIGH", "LOW", "HIGH"), sample_id = c("S1", "S2", "S3")
+# --- 2. Dati per Analisi Integrazione (Final Revision) ---
+# integration_dt: Cell ID, Cluster, Tipo di Tessuto (N/T)
+integration_dt <- data.table(
+  cell = paste0("CELL_", 1:12),
+  integration_cluster = rep(c("C1", "C2"), 6),
+  sample_type = rep(c("N", "T"), each = 6) # N=Normal, T=Tumor
 )
-genes_dt_in <- data.table(
-  chr = c("chr1", "chr2"), start = c(50, 180), end = c(300, 500), gene = c("GENE_A", "GENE_B")
+# cell_type_dt: Cell ID e Annotazione Tipo Cellulare
+cell_type_dt <- data.table(
+  cell = paste0("CELL_", 1:12),
+  cell_type = rep(c("B-Cell", "T-Cell", "Macrophage", "Fibroblast"), 3)
 )
-```
 
-media_geni <- calcola_media_gene_condition_dt(gene_counts_dt, sample_dt)
-head(media_geni)
-
-# Copia per evitare modifiche in-place sui dati base
-counts_copy_e2 <- data.table::copy(gene_counts_dt)
-counts_with_cols <- aggiungi_colonne_base_dt(counts_copy_e2)
-head(counts_with_cols)
-
-joined_dt <- esegui_equi_join_dt(gene_counts_dt, sample_dt)
-head(joined_dt)
-
-
-# Aggregazione per paziente
-conteggi_paziente <- aggrega_conteggi_per_paziente_dt(gene_counts_dt, sample_dt)
-conteggi_paziente
-
-# Trova i Top 10 geni per condition
-top_geni <- trova_top_geni_per_condition_dt(gene_counts_dt, sample_dt)
-top_geni
-
-
-clinical_dt_ex <- data.table(patient_id=c("P1", "P2"), lab=c("GLU", "GLU"), value=c(150, 90))
-lab_dt_ex <- data.table(lab=c("GLU"), lower=c(70), upper=c(100))
-
-class_labs <- classifica_labs_dt(clinical_dt_ex, lab_dt_ex)
-class_labs
-
-# Dati di esempio per i picchi
-atac_peaks_dt_ex <- data.table(
-  chr = c("chr1", "chr2", "chr2", "chr2"), 
-  start = c(1000, 2500000, 3000000, 3500000), 
-  end = c(1500, 2500100, 3000100, 3500100), 
-  score = c(90, 85, 95, 80)
+# --- 3. Dati per Analisi Genomica (Esercizio 11) ---
+# variants_dt: Varianti genetiche
+variants_dt <- data.table(
+  chr = c("chr1", "chr1", "chr2", "chr2", "chr3"),
+  pos = c(100, 150, 200, 250, 300),
+  impact = c("HIGH", "LOW", "HIGH", "MODERATE", "HIGH"),
+  sample_id = c("S1", "S1", "S2", "S3", "S3")
 )
-# Filtraggio e selezione
-filtered_peaks <- filtra_picchi_atac_dt(atac_peaks_dt_ex)
-top_peaks <- seleziona_top_picchi_dt(filtered_peaks)
-top_peaks
-
-stats_wide <- calcola_statistiche_wide_dt(gene_counts_dt, sample_dt)
-head(stats_wide)
-
-
-# Simula dati wide per il melt
-bulk_wide_ex <- data.table(gene = paste0("G", 1:3), S1=c(10, 20, 30), S2=c(50, 40, 30))
-dt_long <- trasforma_e_calcola_totale_dt(bulk_wide_ex)
-dt_long
-
-
-mapped_variants <- mappa_varianti_a_geni_dt(variants_dt_in, genes_dt_in)
-head(mapped_variants)
-
-# Conteggio delle varianti HIGH-Impact
-high_impact_summary <- conta_varianti_high_impact_dt(mapped_variants)
-high_impact_summary$gene_summary
-
-
-# Simulazione seconda coorte
-cohortB_dt_ex <- data.table(sample_id="S5", condition="control", cohort="B")
-combined_samples_ex <- unisci_metadati_dt(sample_dt[, .(sample_id, condition, cohort="A")], cohortB_dt_ex)
-combined_samples_ex
-
-
-# Simulazione del riepilogo per task finali
-summary_table_ex <- data.table(
-  integration_cluster = c(1, 1, 2), cell_type = c("T_Cell", "B_Cell", "T_Cell"), 
-  sample_type = c("Normal", "Normal", "Tumor"), cell_count = c(100, 50, 80)
+# genes_dt: Intervalli di geni
+genes_dt <- data.table(
+  chr = c("chr1", "chr2"),
+  start = c(50, 180),
+  end = c(170, 280),
+  gene = c("GENE_A", "GENE_B")
 )
-# Calcola la percentuale di cell type all'interno di ogni gruppo
-normalized_dt <- task5_normalizza_percentuali(summary_table_ex, output_file = "temp_normalized_percentages.csv")
-head(normalized_dt)
+3. Pipeline 1: Elaborazione Conteggi Bulk (Esercizio 1)
+Questa pipeline dimostra le operazioni di filtraggio, aggregazione e join efficienti con data.table.
 
+3.1. Task 1: Somma e Filtro Geni 'GENE_00' (calcola_somma_geni_00_dt)
+Filtra i campioni treated e aggrega la somma totale per i geni che iniziano con "GENE_00".
 
-# Verifica la disponibilità di tutte le funzioni esportate
-ls(package:myLibraryTS)
+Snippet di codice
 
+somma_filtro_dt <- calcola_somma_geni_00_dt(gene_counts_dt, sample_dt)
+print(somma_filtro_dt)
+3.2. Task 2: Media e Mediana (calcola_media_mediana_geni_00_dt)
+Calcola la media e la mediana dei conteggi per i geni filtrati in Task 1, raggruppando per gene.
+
+Snippet di codice
+
+media_mediana_dt <- calcola_media_mediana_geni_00_dt(gene_counts_dt, sample_dt)
+print(media_mediana_dt)
+3.3. Task 3: Join in Pipeline (calcola_media_gene_condition_dt)
+Esegue il join con i metadati e calcola la media dei conteggi per condition (treated/control) in un'unica catena di comandi.
+
+Snippet di codice
+
+media_condizione_dt <- calcola_media_gene_condition_dt(gene_counts_dt, sample_dt)
+print(media_condizione_dt)
+4. Pipeline 2: Analisi Dati di Integrazione (Revisione Finale)
+Queste funzioni combinano i dati single-cell e generano statistiche e visualizzazioni per tipo cellulare/tessuto/cluster.
+
+4.1. Task 3: Riepilogo Cell Type, Cluster e Tessuto (task3_riepilogo_cluster_celltype_tissue)
+Combina i dati di integrazione con le annotazioni del tipo cellulare e crea una tabella di riepilogo.
+
+Snippet di codice
+
+summary_table_dt <- task3_riepilogo_cluster_celltype_tissue(integration_dt, cell_type_dt)
+print(summary_table_dt)
+4.2. Task 4: Plot Distribuzione Tessuto (task4_plot_distribuzione_tessuto)
+Genera un grafico a barre che visualizza la distribuzione del tipo cellulare nei tessuti Normali/Tumorali per ciascun cluster.
+
+Snippet di codice
+
+# La funzione salverebbe un file PNG, qui mostriamo solo l'oggetto ggplot.
+plot_dt <- task4_plot_distribuzione_tessuto(summary_table_dt, output_png = "temp_plot.png")
+print(plot_dt)
+4.3. Task 5: Normalizzazione Percentuale (task5_normalizza_percentuali)
+Normalizza i conteggi per calcolare la percentuale di ciascun tipo cellulare all'interno del proprio gruppo (cluster x sample type), un passaggio cruciale per confronti equi.
+
+Snippet di codice
+
+normalized_dt <- task5_normalizza_percentuali(summary_table_dt)
+print(head(normalized_dt, 5))
+5. Pipeline 3: Analisi Varianti Genomiche (Esercizio 11)
+Questa sezione si concentra sull'associazione delle varianti alle regioni geniche e sul riepilogo del loro impatto.
+
+5.1. Task 11a: Mappatura Varianti a Geni (mappa_varianti_a_geni_dt)
+Esegue il mapping delle varianti (variants_dt) sulle regioni geniche (genes_dt) utilizzando le coordinate genomiche.
+
+Snippet di codice
+
+mapped_variants_dt <- mappa_varianti_a_geni_dt(variants_dt, genes_dt)
+print(mapped_variants_dt)
+5.2. Task 11b: Conteggio Varianti High-Impact (conta_varianti_high_impact_dt)
+Conta le varianti con impact == "HIGH" raggruppando per gene e campione per identificare i geni più colpiti.
+
+Snippet di codice
+
+high_impact_counts <- conta_varianti_high_impact_dt(mapped_variants_dt)
+print(high_impact_counts)
+
+6. Conclusioni
+Il pacchetto mylibraryTS raggiunge l'obiettivo di fornire un'alternativa performante (grazie all'ottimizzazione con data.table) per l'esecuzione di analisi complesse e ad alto throughput. La modularità delle funzioni consente agli utenti di assemblare facilmente le pipeline necessarie per le loro esigenze, garantendo al contempo risultati veloci e pienamente riproducibili.
