@@ -1,0 +1,787 @@
+---
+title: "REPORT project25"
+author: "Teresa Scardigli"
+date: "06/11/2025`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+---
+
+```{r, warning=FALSE, message=FALSE}
+source("FUNCTIONS.R")
+library(data.table)
+library(tictoc)
+library(ggplot2)
+```
+
+### **EXERCISE 1**:
+
+#### **task 1**: keep counts for samples in condition == "treated" and genes starting with "GENE_00".
+#### **task 2**: compute mean and median count by gene.
+#### **task 3**: join sample mtadata and compute per-condition mean counts by gene in one pipeline.
+
+```{r}
+
+counts_dt_in <- fread("bulk_counts_long.csv")
+sample_dt_in <- fread("sample_metadata.csv")
+
+#tic("Esercizio 1 DT Totale")
+filtered_counts_dt <- calcola_somma_geni_00_dt(counts_dt_in, sample_dt_in)
+gene_summary_dt <- calcola_media_mediana_geni_00_dt(counts_dt_in, sample_dt_in)
+final_summary_dt <- calcola_media_gene_condition_dt(counts_dt_in, sample_dt_in)
+#toc()
+
+ print(head(filtered_counts_dt))
+ print(head(gene_summary_dt))
+print(head(final_summary_dt))
+```
+
+#### **Comparison** execution time: DT vs DF
+```{r performance_comparison, echo=FALSE, warning=FALSE, message=FALSE}
+# TASK 4: Creazione della Tabella di Confronto Tempi
+
+# Definisco i tempi di esecuzione (Questi valori dovrebbero provenire dalle tue misurazioni)
+T_DT1 <- 0.024
+T_DT2 <- 0.006
+T_DT3 <- 0.002
+T_DF1 <- 0.010
+T_DF2 <- 0.012
+T_DF3 <- 0.033
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+            "Task 2",
+            "Task 3"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2, T_DT3),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2, T_DF3)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione tra data.table e data.frame",
+    digits = 3 # Aumenta la precisione dei tempi a 3 cifre decimali
+)
+```
+
+### **EXERCISE 2**
+
+#### **Task 1**: Add la log2 counts column and a binary flag high if count > 100.
+#### **Task 2**: Overwrite high to use a gene-wise threshold (e.g., count>median(count) by=gene)
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# Carica i dati (Sostituisci con il percorso corretto se necessario)
+counts_dt_in <- fread("bulk_counts_long.csv")
+#tic("Esercizio 2 data.table Totale")
+# # Clona per evitare che Task 1 e 2 modifichino la stessa data.table base
+ counts_dt_task1 <- copy(counts_dt_in) 
+ counts_dt_task2 <- aggiungi_colonne_base_dt(counts_dt_task1) 
+ counts_dt_final <- ricalcola_high_per_gene_dt(counts_dt_task2)
+ #toc()
+
+ print(head(counts_dt_final))
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_task1_2, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.014
+T_DT2 <- 0.056
+T_DF1 <- 0.010
+T_DF2 <- 0.018
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+            "Task 2"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione tra data.table e data.frame (Task 1 & 2)",
+    digits = 3 # Aumenta la precisione dei tempi
+)
+```
+
+### **EXERCISE 3**
+
+#### **Task 1**: setkey() on sample_metadata by sample_id; equi-join into the long counts.
+#### **Task 2**: Add a secondary index on (gene, sample_id) in the counts table, then benchmark a subset query before/after
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# Carica i dati (Sostituisci con il percorso corretto se necessario)
+counts_dt_in <- fread("bulk_counts_long.csv")
+metadata_dt_in <- fread("sample_metadata.csv")
+ 
+# # Clona per poter riapplicare setkey e setindex senza side-effects in un ambiente live
+ counts_dt_test <- copy(counts_dt_in) 
+ metadata_dt_test <- copy(metadata_dt_in)
+ 
+ #tic("Esercizio 3 data.table Totale")
+ joined_dt <- esegui_equi_join_dt(counts_dt_test, metadata_dt_test)
+ 
+# # Esecuzione Task 2
+ bench_results <- bench_indice_dt(counts_dt_test, "GENE_0356", "S03")
+ #toc()
+ 
+print(head(joined_dt))
+ #print(paste0("Tempo senza indice: ", bench_results$no_index_time, " secondi"))
+ #print(paste0("Tempo con indice: ", bench_results$with_index_time, " secondi"))
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e3, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.018
+T_DT_pre <- 0.010
+T_DT_post <- 0.005
+T_DT2 <- 0.025
+T_DF1 <- 0.017
+T_DF_pre <- 0.003
+T_DF_post <- 0.002
+T_DF2 <- 0.039
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1 (Join)",
+            "Query Senza Indice",
+            "Query Con Indice",
+            "Task 2 (Aggregazione)"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT_pre, T_DT_post, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF_pre, T_DF_post, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+# Vengono utilizzati i tempi fittizi per la versione data.frame per coerenza nella colonna.
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione (Inclusi Indici)",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 4**
+
+
+#### **Task 1**: Join and compute per-patient total counts.
+#### **Task 2**: Find the top 10 genes by average count within each condition.
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# Carica i dati (Sostituisci con il percorso corretto se necessario)
+counts_dt_in <- fread("bulk_counts_long.csv")
+ meta_dt_in <- fread("sample_metadata.csv")
+
+# tic("Esercizio 4 data.table Totale")
+ per_patient_counts_dt <- aggrega_conteggi_per_paziente_dt(counts_dt_in, meta_dt_in)
+ top_10_genes_dt <- trova_top_geni_per_condition_dt(counts_dt_in, meta_dt_in)
+# toc()
+
+ print(head(per_patient_counts_dt,5))
+ print(top_10_genes_dt,5)
+
+```
+
+#### **Comparison** execution time: DT vs DF
+```{r performance_comparison_e4, echo=FALSE, warning=FALSE, message=FALSE}
+#tabella confronto tempi
+T_DT1 <- 0.018
+T_DT2 <- 0.010
+T_DF1 <- 0.056
+T_DF2 <- 0.019
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione (Inclusi Indici)",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 5**
+
+
+#### **Task 1**: Treat reference ranges as intervals and label each lab as "normal" vs "out_of_range" using a non equi-join.
+#### **Task 2**: Count abnormal rates by patient and by lab.
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# Carica i dati (Sostituisci con il percorso corretto se necessario)
+ clinical_dt_in <- fread("clinical_labs.csv")
+ lab_dt_in <- fread("lab_reference_ranges.csv")
+
+# tic("Esercizio 5 data.table Totale")
+ classified_labs_dt <- classifica_labs_dt(clinical_dt_in, lab_dt_in)
+ abnormal_rates_dt <- calcola_tassi_anomali_dt(classified_labs_dt)
+# toc()
+
+ print(head(classified_labs_dt,5))
+print(head(abnormal_rates_dt, 5))
+```
+
+#### **Comparison** execution time: DT vs DF
+```{r performance_comparison_task_last, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.009
+T_DT2 <- 0.002
+T_DF1 <- 0.003
+T_DF2 <- 0.009
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+            "Task 2"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione tra data.table e data.frame",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 6**
+
+
+#### **Task 1**: For each lab measurement, attach the nearest HR and SBP reading using a rolling join on (patient_id, time) and report the time lag in minutes. 
+#### **Task 2**: Summarize correlation between CRP and nearest HR/SBP by patient. 
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# Carica i dati (Sostituisci con il percorso corretto se necessario)
+ labs_dt_in <- fread("clinical_labs.csv")
+ vitals_dt_in <- fread("vitals_time_series.csv")
+
+# # Esecuzione Task 1 (Clona per i test se necessario)
+ matched_dt_result <- nearest_time_matching_dt(copy(labs_dt_in), copy(vitals_dt_in))
+ 
+# # Esecuzione Task 2
+ correlation_dt_result <- calcola_correlazione_crp_vitals_dt(matched_dt_result)
+ 
+ print(head(matched_dt_result,5))
+ print(correlation_dt_result,5)
+```
+
+#### **Comparison** execution time: DT vs DF
+```{r performance_comparison_last_e6, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.146
+T_DT2 <- 0.037
+T_DF1 <- 0.222
+T_DF2 <- 0.035
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+            "Task 2"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione tra data.table e data.frame",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+
+### **EXERCISE 7**
+
+
+#### **Task 1**: Extract peaks on chr2 with start between 2‚Äì4 Mb. 
+#### **Task 2**: Among those peaks, return the top 50 by score after setorder() (descending). 
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# # Carica i dati (Sostituisci con il percorso corretto se necessario)
+atac_dt_in <- fread("atac_peaks.bed.csv")
+
+# tic("Esercizio 7 data.table Totale")
+filtered_peaks_dt <- filtra_picchi_atac_dt(atac_dt_in)
+ top_50_peaks_dt <- seleziona_top_picchi_dt(filtered_peaks_dt)
+# toc()
+
+ print(top_50_peaks_dt,5)
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e7, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.076
+T_DT2 <- 0.008
+T_DF1 <- 0.032
+T_DF2 <- 0.002
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <-
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance,
+    caption = "Confronto dei Tempi di Esecuzione Esercizio 7: Filtro e Ordinamento",
+    digits = 3 # Precisione per i tempi
+)
+
+```
+
+### **EXERCISE 8**
+
+#### **Task 1**: Compute per-condition robust summary stats for each gene: mean, median, Q1/Q3. 
+#### **Task 2**: Return only genes where treated mean ‚â• 2√ó control mean.
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# # Carica i dati (Sostituisci con il percorso corretto se necessario)
+counts_dt_in <- fread("bulk_counts_long.csv")
+ metadata_dt_in <- fread("sample_metadata.csv")
+
+# tic("Esercizio 8 data.table Totale")
+wide_stats_dt <- calcola_statistiche_wide_dt(counts_dt_in, metadata_dt_in)
+ filtered_result_dt <- filtra_geni_differenziali_dt(wide_stats_dt)
+# toc()
+
+ print(wide_stats_dt,5)
+ print(filtered_result_dt,5)
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e8, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.259
+T_DT2 <- 0.003
+T_DF1 <- 2.134
+T_DF2 <- 0.002
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <-
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance,
+    caption = "Confronto dei Tempi di Esecuzione Esercizio 8: Statistiche e Reshape",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 9**
+
+#### **Task 1**: Convert the matrix to long, add per-sample totals, then back to a gene per condition table with mean counts. 
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# # Carica i dati (Sostituisci con il percorso corretto se necessario)
+ bulk_wide_dt_in <- fread("bulk_counts_wide.csv")
+
+# tic("Esercizio 9 data.table Totale")
+dt_long_result <- trasforma_e_calcola_totale_dt(bulk_wide_dt_in)
+ dt_mean_result <- calcola_media_per_gene_dt(dt_long_result)
+# toc()
+
+ print(head(dt_long_result,5))
+ print(head(dt_mean_result,5))
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e9, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.128
+T_DF1 <- 0.040
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("esercizio9"),
+  
+  Tempo_data.table_Sec = c(T_DT1),
+  Tempo_data.frame_Sec = c(T_DF1)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <-
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance,
+    caption = "Confronto dei Tempi di Esecuzione Esercizio 9: Melt e Aggregazione",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 10**
+
+#### **Task 1**: setkey() both on (chr, start, end) and intersect peaks with gene bodies. 
+#### **Task 2**: Count peaks per gene. 
+#### **Task 3**: Compute overlap length (bp) per peak-gene pair and then sum per gene (as in your slides). 
+#### **Task 4**: Return the top 20 genes by total overlapped bp. 
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# # Carica i dati (Sostituisci con il percorso corretto se necessario)
+atac_dt_in <- fread("atac_peaks.bed.csv")
+ gene_dt_in <- fread("gene_annotation.bed.csv")
+ 
+# tic("Esercizio 10 data.table Totale")
+ overlap_dt_result <- interseca_geni_e_picchi_dt(atac_dt_in, gene_dt_in)
+ peaks_per_gene_dt <- conta_picchi_per_gene_dt(overlap_dt_result)
+ total_overlap_dt <- calcola_sovrapposizione_totale_dt(overlap_dt_result)
+ top_20_genes_dt <- trova_top_geni_overlap_dt(total_overlap_dt, peaks_per_gene_dt)
+# toc()
+
+ print(head(overlap_dt_result,5))
+ print(head(peaks_per_gene_dt,5))
+ print(head(total_overlap_dt,5))
+ print(head(top_20_genes_dt,5))
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e10, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.031
+T_DT2 <- 0.019
+T_DT3 <- 0.013
+T_DT4 <- 0.007
+T_DF1 <- 1.129
+T_DF2 <- 0.008
+T_DF3 <- 0.004
+T_DF4 <- 0.004
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2",
+           "Task 3",
+           "Task 4"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2, T_DT3, T_DT4),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2, T_DF3, T_DF4)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <-
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance,
+    caption = "Confronto dei Tempi di Esecuzione Esercizio 10: Intersezione Genomica (foverlaps)",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 11**
+
+#### **Task 1**:Convert variant positions to 1-bp intervals (pos, pos) and find overlaps with gene intervals. 
+#### **Task 2**: Summarize counts of HIGH impact variants by gene and by sample. 
+#### **Task 3**: List genes with HIGH-impact variants across all samples.
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# # Carica i dati (Sostituisci con il percorso corretto se necessario)
+variants_dt_in <- fread("variants.csv")
+ genes_dt_in <- fread("gene_annotation.bed.csv")
+
+# tic("Esercizio 11 data.table Totale")
+ mapped_variants_dt <- mappa_varianti_a_geni_dt(variants_dt_in, genes_dt_in)
+ high_impact_counts <- conta_varianti_high_impact_dt(mapped_variants_dt)
+ all_samples_result <- geni_in_tutti_i_campioni_dt(mapped_variants_dt)
+# toc()
+ 
+ print(head(mapped_variants_dt,5))
+ print(high_impact_counts_head, 5))
+ print(head(all_samples_result,5))
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e11, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.093
+T_DT2 <- 0.031
+T_DT3 <- 0.010
+T_DF1 <- 0.514
+T_DF2 <- 0.022
+T_DF3 <- 0.010
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2",
+           "Task 3"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2, T_DT3),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2, T_DF3)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <-
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance,
+    caption = "Confronto dei Tempi di Esecuzione Esercizio 11: Mappatura Varianti Genomiche",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+### **EXERCISE 12**
+
+#### **Task 1**: rbindlist(list(A, B), use.names=TRUE, fill=TRUE) and verify column alignment. 
+#### **Task 2**: Order by cohort, condition, sample_id. 
+#### **Task 3**: Join back to bulk_counts_long and compute per-cohort, per-condition mean counts of the top 100 most variable genes. 
+
+```{r}
+# ==============================================================================
+# Esecuzione e Test (data.table)
+# ==============================================================================
+
+# # Carica i dati (Sostituisci con il percorso corretto se necessario)
+ cohortA_dt_in <- fread("cohortA_samples.csv")
+ cohortB_dt_in <- fread("cohortB_samples.csv")
+ bulk_counts_in <- fread("bulk_counts_long.csv")
+
+# tic("Esercizio 12 data.table Totale")
+ combined_samples_dt <- unisci_metadati_dt(cohortA_dt_in, cohortB_dt_in)
+ combined_samples_ordered <- ordina_campioni_dt(combined_samples_dt) 
+ mean_counts_dt <- calcola_media_top_varianti_dt(combined_samples_ordered, bulk_counts_in)
+# toc()
+
+ print(head(mean_counts_dt,5))
+```
+
+#### **Comparison** execution time: DT vs DF
+
+```{r performance_comparison_e12, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.029
+T_DT2 <- 0.052
+T_DT3 <- 0.069
+T_DF1 <- 0.020
+T_DF2 <- 0.017
+T_DF3 <- 0.066
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2",
+           "Task 3"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2, T_DT3),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2, T_DF3)
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+risultati_performance$Speedup_DT_vs_DF <-
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance,
+    caption = "Confronto dei Tempi di Esecuzione Esercizio 12: Unione e Filtro per Varianza",
+    digits = 3 # Precisione per i tempi
+)
+```
+
+
+### **FINAL REVISION**
+
+#### **Task 1**: Provide a new file where cell type, cells and integration clusters are combined 
+#### **Task 2**: Provide a file where the number of each cell type is indicated for each cluster 
+#### **Task 3**: Provide summary table showing cell types associated to integration clusters and also their association to normal and tumor tissue 
+#### **Task 4**: Provide a plot describing the distribution of the cell type in normal/tumor tissue given the integration clusters. 
+#### **Task 5**: Provide a normalized % for the cell types in each of the integration clusters for normal and tumor specimen.
+
+
+```{r}
+# ==============================================================================
+# ESECUZIONE COMPLETA DELLA PIPELINE (Simulazione)
+# ==============================================================================
+
+# tic("revisione_totale")
+# # 0. Pre-Elaborazione
+combined_data <- carica_e_prepara_dati(
+   "annotated_GSM3516673_normal_annotated_GSM3516672_tumor_SeuratIntegration.csv",
+   "nt_combined_clustering.output.csv"
+ )
+ 
+# # 1. Task 1: Salvataggio Dati Combinati
+# tic("Task1")
+ task1_salva_dati_combinati(combined_data)
+# toc()
+ 
+# # 2. Task 2: Conteggi Base
+# tic("Task2")
+ counts_by_cluster_celltype_dt <- task2_conta_cellule_per_cluster_celltype(combined_data)
+ print(head(counts_by_cluster_celltype_dt, 5))
+# toc()
+ 
+# # 3. Task 3: Riepilogo Completo (Input per Task 4 e 5)
+# tic("Task3")
+ summary_table_dt <- task3_riepilogo_cluster_celltype_tissue(combined_data)
+ print(head(summary_table_dt, 5))
+# toc()
+ 
+# # 4. Task 4: Creazione Grafico
+# tic("Task4")
+ task4_crea_grafico_distribuzione(summary_table_dt)
+# toc()
+ 
+# # 5. Task 5: Normalizzazione
+# tic("Task5")
+ normalized_dt <- task5_normalizza_percentuali(summary_table_dt)
+ print(head(normalized_dt, 5))
+# toc()
+ 
+# toc() # Fine timer revisione_totale
+```
+
+#### **Comparison** execution time: DT vs DF vs DP
+
+```{r performance_comparison_new_5tasks, echo=FALSE, warning=FALSE, message=FALSE}
+# Definisco i tempi di esecuzione
+T_DT1 <- 0.025
+T_DT2 <- 0.038
+T_DT3 <- 0.030
+T_DT4 <- 5.530
+T_DT5 <- 0.024
+T_DF1 <- 0.084
+T_DF2 <- 0.245
+T_DF3 <- 0.121
+T_DF4 <- 5.824
+T_DF5 <- 0.062
+T_DP1 <- 0.083
+T_DP2 <- 0.069
+T_DP3 <- 0.059
+T_DP4 <- 5.148
+T_DP5 <- 0.055
+
+# Creazione della tabella riassuntiva
+risultati_performance <- data.frame(
+  Task = c("Task 1",
+           "Task 2",
+           "Task 3",
+           "Task 4",
+           "Task 5"),
+  
+  Tempo_data.table_Sec = c(T_DT1, T_DT2, T_DT3, T_DT4, T_DT5),
+  Tempo_data.frame_Sec = c(T_DF1, T_DF2, T_DF3, T_DF4, T_DF5),
+  Tempo_Tidyverse_Sec = c(T_DP1, T_DP2, T_DP3, T_DP4, T_DP5) # Colonna rinominata
+)
+
+# Aggiungiamo una colonna per il fattore di velocizzazione (Speedup)
+# Basato sul confronto tra Base R DF (T_DF) e data.table (T_DT)
+risultati_performance$Speedup_DT_vs_DF <- 
+  round(risultati_performance$Tempo_data.frame_Sec / risultati_performance$Tempo_data.table_Sec, 1)
+
+# Visualizzazione della Tabella con knitr::kable()
+knitr::kable(
+    risultati_performance, 
+    caption = "Confronto dei Tempi di Esecuzione: data.table vs Base R vs Tidyverse",
+    digits = 3 # Precisione per i tempi
+)
+```
