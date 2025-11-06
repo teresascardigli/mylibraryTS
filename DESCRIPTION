@@ -4,14 +4,14 @@ Title: What the Package Does (Title Case)
 Version: 0.1.0
 Authors@R: c(
     person(
-      "Jane", "Doe",
-      email = "jane@example.com",
+      "Teresa", "Scardigli",
+      email = "teresa.scardigli@edu.unito.it",
       role = c("aut", "cre")
     )
   )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Description: the library was created to perform tasks for the project_oct_25.
+    
+License: UniTo
 Encoding: UTF-8
 LazyData: true
 Imports: 
